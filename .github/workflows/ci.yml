@@ -84,6 +84,23 @@ jobs:
             EOF
             ruby /tmp/t.rb | grep -F ok
           '
+      # A fresh host gets rainbow 3.1.0, then the example's own pin is applied
+      # over it, the way someone moves a gem to a newer release. Ruby itself
+      # comes from the distribution, which has no older release to start from.
+      - name: Upgrade rainbow from 3.1.0 on a fresh host, then plan again with no changes
+        working-directory: examples/local
+        env:
+          CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/${{ matrix.distro }}/Containerfile
+          PODMAN: sudo podman
+        run: |
+          ./down.sh
+          ./up.sh
+          conn3x init
+          conn3x apply -auto-approve -var rainbow_version=3.1.0
+          sudo podman exec circuit-ruby gem list --installed --exact rainbow --version 3.1.0
+          conn3x apply -auto-approve
+          conn3x plan -detailed-exitcode
+          sudo podman exec circuit-ruby ruby -e 'require "rainbow"; v = Gem.loaded_specs["rainbow"].version.to_s; abort "loaded rainbow #{v}" unless v == "3.1.1"; puts Rainbow("upgraded").green' | grep -F upgraded
       - name: Clean up
         if: always()
         working-directory: examples/local
